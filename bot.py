@@ -1,10 +1,11 @@
-from telegram import Bot
+from telegram import Update, Bot
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from datetime import datetime, timedelta
-import time
 import json
+import asyncio
 
 # Получаем токены из переменных окружения
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -43,7 +44,7 @@ def save_sent_releases(sent_releases):
         json.dump(sent_releases, file)
 
 # Проверка новых релизов и отправка в канал
-def check_and_notify():
+async def check_and_notify():
     try:
         # Загружаем отправленные релизы
         sent_releases = load_sent_releases()
@@ -79,7 +80,7 @@ def check_and_notify():
                 if seven_days_ago <= release_date_obj <= today and album_id not in sent_releases:
                     # Отправляем сообщение в Telegram
                     message = f"🎵 Новый релиз от {artist_name}!\n\n{album_name} ({release_date})\n\nСлушайте: {album_url}"
-                    bot.send_message(chat_id=TELEGRAM_CHANNEL_ID, text=message)
+                    await bot.send_message(chat_id=TELEGRAM_CHANNEL_ID, text=message)
 
                     # Добавляем релиз в отправленные
                     sent_releases[album_id] = True
@@ -88,13 +89,38 @@ def check_and_notify():
         save_sent_releases(sent_releases)
 
     except Exception as e:
-        bot.send_message(chat_id=TELEGRAM_CHANNEL_ID, text=f"Ошибка: {e}")
+        await bot.send_message(chat_id=TELEGRAM_CHANNEL_ID, text=f"Ошибка: {e}")
 
-# Основной цикл
+# Команда /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text("Привет! Я готов работать!")
+
+# Тестовая команда /test
+async def test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        await bot.send_message(chat_id=TELEGRAM_CHANNEL_ID, text="Тестовое сообщение: бот работает!")
+        await update.message.reply_text("Сообщение отправлено в канал!")
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка: {e}")
+
+# Настройка приложения
 def main():
-    while True:
-        check_and_notify()
-        time.sleep(600)  # Проверяем каждые 10 минут
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # Обработчики команд
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("test", test))
+
+    # Основной цикл с проверкой релизов каждые 10 минут
+    async def periodic_check():
+        while True:
+            await check_and_notify()
+            await asyncio.sleep(600)  # Проверяем каждые 10 минут
+
+    # Запуск бота и периодических задач
+    loop = asyncio.get_event_loop()
+    loop.create_task(periodic_check())
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
