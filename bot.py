@@ -1,11 +1,11 @@
-from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from datetime import datetime, timedelta
-import asyncio
 import json
+import asyncio
 
 # Получаем токены из переменных окружения
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -26,9 +26,6 @@ sp = spotipy.Spotify(auth_manager=sp_oauth)
 
 # Файл для хранения отправленных релизов
 SENT_RELEASES_FILE = "sent_releases.json"
-
-# Telegram бот
-bot = Bot(token=BOT_TOKEN)
 
 # Загрузка информации о ранее отправленных релизах
 def load_sent_releases():
@@ -71,20 +68,18 @@ async def check_and_notify():
                     continue
 
                 if seven_days_ago <= release_date_obj <= today and album_id not in sent_releases:
-                    # Формируем сообщение с кнопкой
-                    buttons = InlineKeyboardMarkup([[InlineKeyboardButton("Слушать в Spotify", url=album_url)]])
-                    caption = f"🎵 Новый релиз от {artist_name}!\n\n{album_name} ({release_date})"
+                    # Формируем сообщение
+                    message = f"🎵 Новый релиз от {artist_name}!\n\n{album_name} ({release_date})\nСлушать: {album_url}"
                     
-                    if album_image:
-                        await bot.send_photo(
-                            chat_id=TELEGRAM_CHANNEL_ID, photo=album_image, caption=caption, reply_markup=buttons
-                        )
-                    else:
-                        await bot.send_message(
-                            chat_id=TELEGRAM_CHANNEL_ID, text=caption, reply_markup=buttons
-                        )
-
+                    new_releases.append(message)
                     sent_releases[album_id] = True
+
+        # Отправляем новые релизы
+        if new_releases:
+            await bot.send_message(
+                chat_id=TELEGRAM_CHANNEL_ID,
+                text="\n\n".join(new_releases)
+            )
 
         save_sent_releases(sent_releases)
 
@@ -93,14 +88,17 @@ async def check_and_notify():
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Привет! Бот готов отправлять новинки из Spotify!")
+    await update.message.reply_text("Привет! Я работаю через polling!")
 
 # Основной запуск
 def main():
     print("Запуск polling...")
     application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # Обработчики команд
     application.add_handler(CommandHandler("start", start))
 
+    # Регулярная проверка новинок
     async def periodic_task():
         while True:
             await check_and_notify()
