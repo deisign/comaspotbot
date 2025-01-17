@@ -1,9 +1,8 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-
 import os
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth
+from spotipy.oauth2 import SpotifyClientCredentials
 
 # Получаем токены из переменных окружения
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -11,13 +10,10 @@ SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 SPOTIFY_REFRESH_TOKEN = os.getenv("SPOTIFY_REFRESH_TOKEN")
 
-# Настройка Spotify API
-sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+# Настройка Spotify API с использованием Refresh Token
+sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
     client_id=SPOTIFY_CLIENT_ID,
-    client_secret=SPOTIFY_CLIENT_SECRET,
-    redirect_uri="https://spotify-refresh-token-generator.netlify.app",  # Обновлённый Redirect URI
-    scope="user-follow-read",
-    open_browser=False
+    client_secret=SPOTIFY_CLIENT_SECRET
 ))
 
 # Команда /start
