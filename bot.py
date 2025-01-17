@@ -1,9 +1,9 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-
 import os
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from datetime import datetime, timedelta
 
 # Получаем токены из переменных окружения
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -29,6 +29,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # Команда /releases для проверки новых релизов
 async def releases(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
+        # Вычисляем дату 7 дней назад
+        today = datetime.now()
+        seven_days_ago = today - timedelta(days=7)
+
         # Получаем список подписанных артистов
         artists = sp.current_user_followed_artists(limit=50)["artists"]["items"]
         new_releases = []
@@ -47,13 +51,20 @@ async def releases(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 album_name = album["name"]
                 album_url = album["external_urls"]["spotify"]
 
-                # Добавляем только релизы за последние 7 дней
-                if "2025-01-01" <= release_date <= "2025-01-14":  # Пример: заменить на динамическую проверку
+                # Конвертируем дату релиза
+                try:
+                    release_date_obj = datetime.strptime(release_date, "%Y-%m-%d")
+                except ValueError:
+                    # Если дата указана как год (например, "2025"), пропускаем
+                    continue
+
+                # Проверяем, попадает ли релиз в последние 7 дней
+                if seven_days_ago <= release_date_obj <= today:
                     new_releases.append(f"{artist_name}: {album_name} ({release_date})\n{album_url}")
 
         # Формируем сообщение
         if new_releases:
-            message = "Новинки за последние дни:\n\n" + "\n\n".join(new_releases)
+            message = "Новинки за последние 7 дней:\n\n" + "\n\n".join(new_releases)
         else:
             message = "Пока новых релизов нет."
 
